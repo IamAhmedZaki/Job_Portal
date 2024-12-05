@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User,Group
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth import login, logout, authenticate
 from django.utils.http import urlsafe_base64_encode
@@ -17,7 +17,7 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .serializers import UserSerializer, SignupSerializer, LoginSerializer,ChangePasswordSerializer,PasswordResetRequestSerializer,PasswordResetSerializer
+from .serializers import UserSerializer, SignupSerializer, LoginSerializer,ChangePasswordSerializer,PasswordResetRequestSerializer,PasswordResetSerializer,StatusEnum
 
 
 class SignupView(APIView):
@@ -30,11 +30,14 @@ class SignupView(APIView):
         data=request.data
         serializer=SignupSerializer(data=data)
         if serializer.is_valid():
-            groups=serializer.validated_data.pop('role')
+            role = serializer.validated_data.pop('role')
+            role_enum = StatusEnum[role]
             serializer.validated_data['password'] = make_password(serializer.validated_data['password'])
             users=User.objects.create(**serializer.validated_data)
-            users.groups.set(groups)
+            group = Group.objects.get(name=role_enum.value)  # Use enum value as group name
+            users.groups.add(group)
             return Response("User Created")
+        return Response(serializer.errors,status.HTTP_400_BAD_REQUEST)
             
 
 class LoginView(APIView):
