@@ -20,46 +20,54 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import UserSerializer, SignupSerializer, LoginSerializer,ChangePasswordSerializer,PasswordResetRequestSerializer,PasswordResetSerializer
 
 
-@api_view(['POST'])
-@swagger_auto_schema(request_body=SignupSerializer)
-def signup_view(request : Request):
-    data = request.data
-    serializer = SignupSerializer(data=data)
-    if serializer.is_valid():
-        data = serializer.validated_data
-        data['password'] = make_password(data['password'])
-        # data['is_staff'] = 1
-        # data['is_superuser'] = 1
-        User.objects.create(**data)
-    else:
-        return Response("invalid data", status=status.HTTP_400_BAD_REQUEST)
-    return Response("success")
-
-
-
-
-@api_view(['POST'])
-
-@swagger_auto_schema(request_body=LoginSerializer)
-def login_view(request:Request):
-    data = request.data
-    serializer = LoginSerializer(data=data)
+class SignupView(APIView):
+    queryset=User.objects.all()
+    serializer_class=SignupSerializer
+    permission_classes=[AllowAny]
     
-    if serializer.is_valid():
-        data = serializer.validated_data
-        user = authenticate(request, username=data['username'], password=data['password'])
-        
-        if user is not None:
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }, status=status.HTTP_200_OK)
-        else: 
-           return Response("login credentials given were wrong", status=status.HTTP_400_BAD_REQUEST)
-    else: 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @swagger_auto_schema(request_body=SignupSerializer)
+    def post(self, request:Request):
+        data=request.data
+        serializer=SignupSerializer(data=data)
+        if serializer.is_valid():
+            groups=serializer.validated_data.pop('role')
+            serializer.validated_data['password'] = make_password(serializer.validated_data['password'])
+            users=User.objects.create(**serializer.validated_data)
+            users.groups.set(groups)
+            return Response("User Created")
+            
 
+class LoginView(APIView):
+    queryset=User.objects.all()
+    serializer_class=LoginSerializer
+    permission_classes=[AllowAny]
+    
+    @swagger_auto_schema(request_body=LoginSerializer)
+    def post(self, request:Request):
+        data=request.data
+        serializer=LoginSerializer(data=data)
+        if serializer.is_valid():
+            data = serializer.validated_data
+            user = authenticate(request, username=data['username'], password=data['password'])
+        
+            if user is not None:
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token),
+                }, status=status.HTTP_200_OK)
+            else: 
+                return Response("login credentials given were wrong", status=status.HTTP_400_BAD_REQUEST)
+        else: 
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+    
+    
 
 @api_view(['POST'])
 def logout_view(request: Request):
@@ -67,13 +75,6 @@ def logout_view(request: Request):
     return Response("log out!!!!!!")
 
 
-@api_view(['GET'])
-def profile_view(request: Request):
-    if request.user.is_authenticated:
-        user = UserSerializer(request.user)
-        return Response(user.data)
-    else:
-        return Response("please login")
     
     
     
